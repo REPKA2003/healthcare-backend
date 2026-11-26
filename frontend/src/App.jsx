@@ -11,9 +11,16 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [uploadMsg, setUploadMsg] = useState('');
   const [online, setOnline] = useState(null);
+  const [toasts, setToasts] = useState([]);
+
+  const pushToast = (message, type = 'success') => {
+    const id = Date.now() + Math.random();
+    setToasts(t => [...t, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(t => t.filter(x => x.id !== id));
+    }, 3500);
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -28,7 +35,6 @@ export default function App() {
 
   const load = async () => {
     setLoading(true);
-    setError('');
     try {
       const url = debouncedSearch
         ? `${API}/patients?search=${encodeURIComponent(debouncedSearch)}`
@@ -40,7 +46,7 @@ export default function App() {
       setPatients(p);
       setAppointments(a);
     } catch (e) {
-      setError('Не удалось загрузить данные. Проверьте соединение.');
+      pushToast('Не удалось загрузить данные. Проверьте соединение.', 'error');
     } finally {
       setLoading(false);
     }
@@ -50,24 +56,23 @@ export default function App() {
 
   const addPatient = async (e) => {
     e.preventDefault();
-    setError('');
     try {
       const res = await fetch(`${API}/patients`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ full_name: name, phone }),
       });
-      if (!res.ok) throw new Error('Ошибка сохранения');
+      if (!res.ok) throw new Error();
       setName(''); setPhone('');
+      pushToast('Пациент добавлен');
       load();
     } catch (e) {
-      setError('Не удалось добавить пациента.');
+      pushToast('Не удалось добавить пациента', 'error');
     }
   };
 
   const uploadPhoto = async (patientId, file) => {
     if (!file) return;
-    setUploadMsg('');
     const form = new FormData();
     form.append('photo', file);
     try {
@@ -77,9 +82,9 @@ export default function App() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Ошибка загрузки');
-      setUploadMsg(`Файл ${data.filename} (${data.size} байт) загружен`);
+      pushToast(`Файл ${data.filename} загружен`);
     } catch (e) {
-      setUploadMsg(e.message);
+      pushToast(e.message, 'error');
     }
   };
 
@@ -88,6 +93,8 @@ export default function App() {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     window.history.replaceState(null, '', `#${id}`);
   };
+
+  const cancelledCount = appointments.filter(a => a.status === 'cancelled').length;
 
   return (
     <div className="page">
@@ -110,8 +117,20 @@ export default function App() {
       </header>
 
       <div className="page-content">
-        {error && <div className="alert alert-error">{error}</div>}
-        {uploadMsg && <div className="alert" style={{ background: '#ecfdf5', color: '#059669' }}>{uploadMsg}</div>}
+        <div className="dashboard">
+          <div className="stat-card">
+            <div className="label">Пациентов</div>
+            <div className="value">{loading ? '…' : patients.length}</div>
+          </div>
+          <div className="stat-card">
+            <div className="label">Записей</div>
+            <div className="value">{loading ? '…' : appointments.length}</div>
+          </div>
+          <div className="stat-card">
+            <div className="label">Отменено</div>
+            <div className="value danger">{loading ? '…' : cancelledCount}</div>
+          </div>
+        </div>
 
         <section className="card" id="add">
           <h2>Добавить пациента</h2>
@@ -138,9 +157,16 @@ export default function App() {
           />
 
           {loading ? (
-            <div className="loading">Загрузка...</div>
+            <div>
+              <div className="skeleton skeleton-row"></div>
+              <div className="skeleton skeleton-row"></div>
+              <div className="skeleton skeleton-row"></div>
+            </div>
           ) : patients.length === 0 ? (
-            <div className="empty">Пока нет пациентов</div>
+            <div className="empty-state">
+              <div className="icon">👤</div>
+              <div>Пока нет пациентов. Добавьте первого!</div>
+            </div>
           ) : (
             <ul className="list">
               {patients.map(p => (
@@ -167,9 +193,15 @@ export default function App() {
         <section className="card" id="appointments">
           <h2>Записи на приём</h2>
           {loading ? (
-            <div className="loading">Загрузка...</div>
+            <div>
+              <div className="skeleton skeleton-row"></div>
+              <div className="skeleton skeleton-row"></div>
+            </div>
           ) : appointments.length === 0 ? (
-            <div className="empty">Пока нет записей</div>
+            <div className="empty-state">
+              <div className="icon">📅</div>
+              <div>Пока нет записей на приём.</div>
+            </div>
           ) : (
             <ul className="list">
               {appointments.map(a => (
@@ -194,7 +226,7 @@ export default function App() {
         <div className="inner">
           <div>
             <div className="footer-brand">МедУчёт</div>
-            <div>© {new Date().getFullYear()} Учебный проект. Все права защищены.</div>
+            <div>© {new Date().getFullYear()} Учебный проект.</div>
           </div>
           <div className="footer-links">
             <a href="#add" onClick={goTo('add')}>Добавить</a>
@@ -204,6 +236,14 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      <div className="toast-container">
+        {toasts.map(t => (
+          <div key={t.id} className={`toast ${t.type === 'error' ? 'error' : ''}`}>
+            {t.message}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
