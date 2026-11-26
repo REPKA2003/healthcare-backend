@@ -1,7 +1,15 @@
 const express = require('express');
+const cors = require('cors');
 const { pool, connectWithRetry } = require('./db');
 
 const app = express();
+
+// CORS — строго до маршрутов
+app.use(cors({
+  origin: 'https://healthcare-backend-phi.vercel.app',
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+}));
+
 app.use(express.json());
 
 app.get('/health', async (req, res) => {
