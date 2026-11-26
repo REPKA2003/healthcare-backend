@@ -50,7 +50,7 @@ app.post('/api/appointments', async (req, res) => {
   res.status(201).json(result.rows[0]);
 });
 
-const PORT = process.env.PORT || 4000;
+const port = process.env.PORT || 4000;
 
 connectWithRetry()
   .then(() => {
