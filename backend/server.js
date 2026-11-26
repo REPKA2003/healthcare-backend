@@ -54,7 +54,7 @@ const PORT = process.env.PORT || 4000;
 
 connectWithRetry()
   .then(() => {
-    app.listen(PORT, () => console.log(`Backend on :${PORT}`));
+    app.listen(port, () => console.log(`Server on ${port}`));
   })
   .catch(err => {
     console.error(err);
