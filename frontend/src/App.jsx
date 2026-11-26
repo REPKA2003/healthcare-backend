@@ -107,7 +107,7 @@ export default function App() {
                 <span>
                   {a.patient_name} → {a.doctor_name}
                   <div className="meta">
-                    {new Date(a.appointment_time).toLocaleString()}
+                    {new Date(a.appointment_time).toISOString().slice(0, 16).replace('T', ' ')}
                   </div>
                 </span>
                 <span className={`badge badge-${a.status || 'scheduled'}`}>
