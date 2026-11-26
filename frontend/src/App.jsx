@@ -7,15 +7,26 @@ export default function App() {
   const [appointments, setAppointments] = useState([]);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [uploadMsg, setUploadMsg] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const load = async () => {
     setLoading(true);
     setError('');
     try {
+      const url = debouncedSearch
+        ? `${API}/patients?search=${encodeURIComponent(debouncedSearch)}`
+        : `${API}/patients`;
       const [p, a] = await Promise.all([
-        fetch(`${API}/patients`).then(r => r.json()),
+        fetch(url).then(r => r.json()),
         fetch(`${API}/appointments`).then(r => r.json()),
       ]);
       setPatients(p);
@@ -27,7 +38,7 @@ export default function App() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [debouncedSearch]);
 
   const addPatient = async (e) => {
     e.preventDefault();
@@ -46,6 +57,24 @@ export default function App() {
     }
   };
 
+  const uploadPhoto = async (patientId, file) => {
+    if (!file) return;
+    setUploadMsg('');
+    const form = new FormData();
+    form.append('photo', file);
+    try {
+      const res = await fetch(`${API}/patients/${patientId}/photo`, {
+        method: 'POST',
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка загрузки');
+      setUploadMsg(`Файл ${data.filename} (${data.size} байт) загружен`);
+    } catch (e) {
+      setUploadMsg(e.message);
+    }
+  };
+
   return (
     <div className="page">
       <header className="header">
@@ -56,28 +85,32 @@ export default function App() {
       </header>
 
       {error && <div className="alert alert-error">{error}</div>}
+      {uploadMsg && <div className="alert" style={{ background: '#ecfdf5', color: '#059669' }}>{uploadMsg}</div>}
 
       <section className="card">
         <h2>Добавить пациента</h2>
         <form onSubmit={addPatient} className="form-row">
-          <input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="ФИО"
-            required
-          />
-          <input
-            value={phone}
-            onChange={e => setPhone(e.target.value)}
-            placeholder="Телефон"
-            required
-          />
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="ФИО" required />
+          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Телефон" required />
           <button type="submit" className="btn-primary">Добавить</button>
         </form>
       </section>
 
       <section className="card">
-        <h2>Пациенты</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h2 style={{ margin: 0 }}>Пациенты</h2>
+          <a href={`${API}/patients/export`} className="btn-ghost" style={{ padding: '8px 12px', textDecoration: 'none' }}>
+            Экспорт в CSV
+          </a>
+        </div>
+
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Поиск по ФИО или телефону..."
+          style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 12 }}
+        />
+
         {loading ? (
           <div className="loading">Загрузка...</div>
         ) : patients.length === 0 ? (
@@ -87,7 +120,18 @@ export default function App() {
             {patients.map(p => (
               <li key={p.id}>
                 <span>{p.full_name}</span>
-                <span className="meta">{p.phone}</span>
+                <span className="meta" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {p.phone}
+                  <label style={{ cursor: 'pointer', fontSize: '.8rem', color: '#2563eb' }}>
+                    Фото
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={e => uploadPhoto(p.id, e.target.files[0])}
+                    />
+                  </label>
+                </span>
               </li>
             ))}
           </ul>
