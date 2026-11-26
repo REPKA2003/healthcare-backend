@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-const API = '/api';
+const API = import.meta.env.VITE_API_BASE_URL + '/api';
 
 export default function App() {
   const [patients, setPatients] = useState([]);
