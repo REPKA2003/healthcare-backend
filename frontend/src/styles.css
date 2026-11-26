@@ -174,3 +174,90 @@ button {
   color: var(--muted);
   font-size: .9rem;
 }
+
+.app-header {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.app-header .inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.brand .logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.nav {
+  display: flex;
+  gap: 6px;
+}
+
+.nav a {
+  text-decoration: none;
+  color: var(--muted);
+  font-size: .9rem;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: background .15s, color .15s;
+}
+
+.nav a:hover {
+  background: #f3f4f6;
+  color: var(--text);
+}
+
+.nav a.active {
+  background: #eff6ff;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  display: inline-block;
+  margin-right: 6px;
+}
+
+.status-dot.offline {
+  background: var(--danger);
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+  font-size: .8rem;
+  color: var(--muted);
+}
