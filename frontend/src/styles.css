@@ -261,3 +261,50 @@ button {
   font-size: .8rem;
   color: var(--muted);
 }
+
+html {
+  scroll-behavior: smooth;
+}
+
+.app-footer {
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  margin-top: 40px;
+}
+
+.app-footer .inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 20px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: .85rem;
+  color: var(--muted);
+}
+
+.app-footer a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.app-footer a:hover {
+  color: var(--primary);
+}
+
+.footer-links {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.footer-brand {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* отступ под липкий header при прокрутке к секциям */
+section.card[id] {
+  scroll-margin-top: 80px;
+}

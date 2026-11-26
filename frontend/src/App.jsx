@@ -83,18 +83,24 @@ export default function App() {
     }
   };
 
+  const goTo = (id) => (e) => {
+    e.preventDefault();
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.history.replaceState(null, '', `#${id}`);
+  };
+
   return (
     <div className="page">
       <header className="app-header">
         <div className="inner">
-          <a href="/" className="brand">
+          <a href="/" className="brand" onClick={goTo('add')}>
             <span className="logo">М</span>
             МедУчёт
           </a>
           <nav className="nav">
-            <a href="#add">Добавить</a>
-            <a href="#patients">Пациенты</a>
-            <a href="#appointments">Записи</a>
+            <a href="#add" onClick={goTo('add')}>Добавить</a>
+            <a href="#patients" onClick={goTo('patients')}>Пациенты</a>
+            <a href="#appointments" onClick={goTo('appointments')}>Записи</a>
           </nav>
           <div className="header-status">
             <span className={`status-dot ${online === false ? 'offline' : ''}`}></span>
@@ -183,6 +189,21 @@ export default function App() {
           )}
         </section>
       </div>
+
+      <footer className="app-footer">
+        <div className="inner">
+          <div>
+            <div className="footer-brand">МедУчёт</div>
+            <div>© {new Date().getFullYear()} Учебный проект. Все права защищены.</div>
+          </div>
+          <div className="footer-links">
+            <a href="#add" onClick={goTo('add')}>Добавить</a>
+            <a href="#patients" onClick={goTo('patients')}>Пациенты</a>
+            <a href="#appointments" onClick={goTo('appointments')}>Записи</a>
+            <a href={`${BASE}/health`} target="_blank" rel="noopener noreferrer">API</a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
