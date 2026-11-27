@@ -1,9 +1,18 @@
 import { useEffect, useState } from 'react';
+import Login from './Login';
+import { getToken, getRole, clearAuth } from './api';
 
 const API = import.meta.env.VITE_API_BASE_URL + '/api';
 const BASE = import.meta.env.VITE_API_BASE_URL;
 
+function authHeaders() {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export default function App() {
+  const [authed, setAuthed] = useState(!!getToken());
+  const [role, setRoleState] = useState(getRole());
   const [patients, setPatients] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [name, setName] = useState('');
@@ -17,9 +26,7 @@ export default function App() {
   const pushToast = (message, type = 'success') => {
     const id = Date.now() + Math.random();
     setToasts(t => [...t, { id, message, type }]);
-    setTimeout(() => {
-      setToasts(t => t.filter(x => x.id !== id));
-    }, 3500);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3500);
   };
 
   useEffect(() => {
@@ -40,33 +47,33 @@ export default function App() {
         ? `${API}/patients?search=${encodeURIComponent(debouncedSearch)}`
         : `${API}/patients`;
       const [p, a] = await Promise.all([
-        fetch(url).then(r => r.json()),
-        fetch(`${API}/appointments`).then(r => r.json()),
+        fetch(url, { headers: authHeaders() }).then(r => r.json()),
+        fetch(`${API}/appointments`, { headers: authHeaders() }).then(r => r.json()),
       ]);
-      setPatients(p);
-      setAppointments(a);
+      setPatients(Array.isArray(p) ? p : []);
+      setAppointments(Array.isArray(a) ? a : []);
     } catch (e) {
-      pushToast('Не удалось загрузить данные. Проверьте соединение.', 'error');
+      pushToast('Не удалось загрузить данные', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, [debouncedSearch]);
+  useEffect(() => { if (authed) load(); }, [debouncedSearch, authed]);
 
   const addPatient = async (e) => {
     e.preventDefault();
     try {
       const res = await fetch(`${API}/patients`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ full_name: name, phone }),
       });
       if (!res.ok) throw new Error();
       setName(''); setPhone('');
       pushToast('Пациент добавлен');
       load();
-    } catch (e) {
+    } catch {
       pushToast('Не удалось добавить пациента', 'error');
     }
   };
@@ -78,6 +85,7 @@ export default function App() {
     try {
       const res = await fetch(`${API}/patients/${patientId}/photo`, {
         method: 'POST',
+        headers: authHeaders(),
         body: form,
       });
       const data = await res.json();
@@ -88,13 +96,26 @@ export default function App() {
     }
   };
 
+  const logout = () => {
+    clearAuth();
+    setAuthed(false);
+    setRoleState('');
+    setPatients([]);
+    setAppointments([]);
+  };
+
   const goTo = (id) => (e) => {
     e.preventDefault();
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     window.history.replaceState(null, '', `#${id}`);
   };
 
+  if (!authed) {
+    return <Login onSuccess={(r) => { setAuthed(true); setRoleState(r); }} />;
+  }
+
   const cancelledCount = appointments.filter(a => a.status === 'cancelled').length;
+  const isStaff = role === 'staff';
 
   return (
     <div className="page">
@@ -105,15 +126,16 @@ export default function App() {
             МедУчёт
           </a>
           <nav className="nav">
-            <a href="#add" onClick={goTo('add')}>Добавить</a>
+            {isStaff && <a href="#add" onClick={goTo('add')}>Добавить</a>}
             <a href="#patients" onClick={goTo('patients')}>Пациенты</a>
             <a href="#appointments" onClick={goTo('appointments')}>Записи</a>
           </nav>
-          <div className="header-status">
-            <span className={`status-dot ${online === false ? 'offline' : ''}`}></span>
-            <span className="status-text">
-              {online === null ? 'Проверка...' : online ? 'Сервер доступен' : 'Сервер недоступен'}
-            </span>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div className="header-status">
+              <span className={`status-dot ${online === false ? 'offline' : ''}`}></span>
+              <span className="status-text">{role === 'staff' ? 'Сотрудник' : 'Пациент'}</span>
+            </div>
+            <button className="btn-ghost" onClick={logout}>Выйти</button>
           </div>
         </div>
       </header>
@@ -134,62 +156,51 @@ export default function App() {
           </div>
         </div>
 
-        <section className="card" id="add">
-          <h2>Добавить пациента</h2>
-          <form onSubmit={addPatient} className="form-row">
-            <div className="field">
-              <label htmlFor="patient-name">ФИО</label>
-              <input
-                id="patient-name"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="Иванов Иван Иванович"
-                autoComplete="name"
-                required
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="patient-phone">Телефон</label>
-              <input
-                id="patient-phone"
-                type="tel"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                placeholder="+7 999 000-00-00"
-                autoComplete="tel"
-                inputMode="tel"
-                required
-              />
-            </div>
-            <button type="submit" className="btn-primary btn-block">Добавить</button>
-          </form>
-        </section>
+        {isStaff && (
+          <section className="card" id="add">
+            <h2>Добавить пациента</h2>
+            <form onSubmit={addPatient} className="form-row">
+              <div className="field">
+                <label htmlFor="patient-name">ФИО</label>
+                <input id="patient-name" value={name} onChange={e => setName(e.target.value)} placeholder="Иванов Иван" required />
+              </div>
+              <div className="field">
+                <label htmlFor="patient-phone">Телефон</label>
+                <input id="patient-phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 999 000-00-00" required />
+              </div>
+              <button type="submit" className="btn-primary btn-block">Добавить</button>
+            </form>
+          </section>
+        )}
 
         <section className="card" id="patients">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
             <h2 style={{ margin: 0 }}>Пациенты</h2>
-            <a href={`${API}/patients/export`} className="btn-ghost" style={{ padding: '8px 12px', textDecoration: 'none' }}>
-              Экспорт в CSV
-            </a>
+            {isStaff && (
+              <a href={`${API}/patients/export`} className="btn-ghost" style={{ padding: '8px 12px', textDecoration: 'none' }}>
+                Экспорт в CSV
+              </a>
+            )}
           </div>
 
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Поиск по ФИО или телефону..."
-            style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 12 }}
-          />
+          {isStaff && (
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Поиск по ФИО или телефону..."
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 12 }}
+            />
+          )}
 
           {loading ? (
             <div>
-              <div className="skeleton skeleton-row"></div>
               <div className="skeleton skeleton-row"></div>
               <div className="skeleton skeleton-row"></div>
             </div>
           ) : patients.length === 0 ? (
             <div className="empty-state">
               <div className="icon">👤</div>
-              <div>Пока нет пациентов. Добавьте первого!</div>
+              <div>Пока нет пациентов</div>
             </div>
           ) : (
             <ul className="list">
@@ -198,15 +209,12 @@ export default function App() {
                   <span>{p.full_name}</span>
                   <span className="meta" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     {p.phone}
-                    <label style={{ cursor: 'pointer', fontSize: '.8rem', color: '#2563eb' }}>
-                      Фото
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        onChange={e => uploadPhoto(p.id, e.target.files[0])}
-                      />
-                    </label>
+                    {isStaff && (
+                      <label style={{ cursor: 'pointer', fontSize: '.8rem', color: '#2563eb' }}>
+                        Фото
+                        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => uploadPhoto(p.id, e.target.files[0])} />
+                      </label>
+                    )}
                   </span>
                 </li>
               ))}
@@ -217,14 +225,11 @@ export default function App() {
         <section className="card" id="appointments">
           <h2>Записи на приём</h2>
           {loading ? (
-            <div>
-              <div className="skeleton skeleton-row"></div>
-              <div className="skeleton skeleton-row"></div>
-            </div>
+            <div className="skeleton skeleton-row"></div>
           ) : appointments.length === 0 ? (
             <div className="empty-state">
               <div className="icon">📅</div>
-              <div>Пока нет записей на приём.</div>
+              <div>Пока нет записей</div>
             </div>
           ) : (
             <ul className="list">
@@ -232,9 +237,7 @@ export default function App() {
                 <li key={a.id}>
                   <span>
                     {a.patient_name} → {a.doctor_name}
-                    <div className="meta">
-                      {new Date(a.appointment_time).toISOString().slice(0, 16).replace('T', ' ')}
-                    </div>
+                    <div className="meta">{new Date(a.appointment_time).toISOString().slice(0, 16).replace('T', ' ')}</div>
                   </span>
                   <span className={`badge badge-${a.status || 'scheduled'}`}>
                     {a.status === 'cancelled' ? 'Отменена' : 'Запланирована'}
@@ -253,7 +256,6 @@ export default function App() {
             <div>© {new Date().getFullYear()} Учебный проект.</div>
           </div>
           <div className="footer-links">
-            <a href="#add" onClick={goTo('add')}>Добавить</a>
             <a href="#patients" onClick={goTo('patients')}>Пациенты</a>
             <a href="#appointments" onClick={goTo('appointments')}>Записи</a>
             <a href={`${BASE}/health`} target="_blank" rel="noopener noreferrer">API</a>
@@ -263,9 +265,7 @@ export default function App() {
 
       <div className="toast-container">
         {toasts.map(t => (
-          <div key={t.id} className={`toast ${t.type === 'error' ? 'error' : ''}`}>
-            {t.message}
-          </div>
+          <div key={t.id} className={`toast ${t.type === 'error' ? 'error' : ''}`}>{t.message}</div>
         ))}
       </div>
     </div>
