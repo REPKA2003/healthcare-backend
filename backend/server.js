@@ -14,7 +14,6 @@ app.use(cors({
 
 app.use(express.json());
 
-// публичные маршруты — до authRequired
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -32,6 +31,41 @@ app.use('/api', authRequired);
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// Список врачей (хардкод, для демо)
+app.get('/api/doctors', async (req, res) => {
+  res.json([
+    { name: 'Терапевт Смирнова', specialty: 'Терапевт' },
+    { name: 'Кардиолог Кузнецов', specialty: 'Кардиолог' },
+    { name: 'Невролог Орлова', specialty: 'Невролог' },
+  ]);
+});
+
+// Свободные слоты на 7 дней вперёд для врача
+app.get('/api/doctors/:name/slots', async (req, res) => {
+  const doctor = decodeURIComponent(req.params.name);
+  const slots = [];
+  const now = new Date();
+
+  for (let d = 0; d < 7; d++) {
+    const day = new Date(now);
+    day.setDate(now.getDate() + d);
+    const dateStr = day.toISOString().slice(0, 10);
+    ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'].forEach(time => {
+      slots.push(`${dateStr}T${time}:00`);
+    });
+  }
+
+  const taken = await pool.query(
+    `SELECT appointment_time FROM appointments
+     WHERE doctor_name = $1 AND status = 'scheduled'`,
+    [doctor]
+  );
+  const takenSet = new Set(taken.rows.map(r => r.appointment_time.toISOString().slice(0, 19)));
+
+  const free = slots.filter(s => !takenSet.has(s));
+  res.json(free);
 });
 
 // Пациенты: staff видит всех (с поиском), patient — только себя
@@ -123,12 +157,46 @@ app.post('/api/appointments', async (req, res) => {
     }
   }
 
-  const result = await pool.query(
-    `INSERT INTO appointments (patient_id, doctor_name, appointment_time, reason)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [patient_id, doctor_name, appointment_time, reason]
+  // проверка занятости слота
+  const conflict = await pool.query(
+    `SELECT 1 FROM appointments
+     WHERE doctor_name = $1 AND appointment_time = $2 AND status = 'scheduled'`,
+    [doctor_name, appointment_time]
   );
-  res.status(201).json(result.rows[0]);
+  if (conflict.rowCount > 0) {
+    return res.status(409).json({ error: 'slot already taken' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO appointments (patient_id, doctor_name, appointment_time, reason)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [patient_id, doctor_name, appointment_time, reason]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'slot already taken' });
+    throw e;
+  }
+});
+
+// Отмена записи: patient — только своей
+app.patch('/api/appointments/:id/cancel', async (req, res) => {
+  const id = parseInt(req.params.id);
+  let query = `UPDATE appointments SET status = 'cancelled' WHERE id = $1 AND status = 'scheduled'`;
+  const params = [id];
+
+  if (req.user.role === 'patient') {
+    query += ` AND patient_id IN (SELECT id FROM patients WHERE user_id = $2)`;
+    params.push(req.user.sub);
+  }
+
+  query += ' RETURNING *';
+  const result = await pool.query(query, params);
+  if (result.rowCount === 0) {
+    return res.status(404).json({ error: 'not found or already cancelled' });
+  }
+  res.json(result.rows[0]);
 });
 
 const port = process.env.PORT || 4000;
