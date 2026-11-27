@@ -513,6 +513,58 @@ section.card[id] {
   color: #fff;
 }
 
+.filter-row,
+.sort-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.sort-row { margin-bottom: 12px; }
+
+.filter-chip {
+  background: #fafbfc;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: .85rem;
+  cursor: pointer;
+  color: var(--text);
+  transition: border-color .15s, background .15s, color .15s;
+}
+
+.filter-chip:hover { border-color: var(--primary); }
+
+.filter-chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  margin-top: 6px;
+  font-size: .85rem;
+  line-height: 1;
+}
+
+.star { color: #d1d5db; }
+.star.filled { color: #f59e0b; }
+
+.rating-num {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: .8rem;
+}
+
+@media (max-width: 640px) {
+  .filter-chip { padding: 8px 12px; font-size: .8rem; }
+}
+
 @media (max-width: 640px) {
   .doctor-grid { grid-template-columns: 1fr; }
   .date-row, .time-grid { gap: 6px; }

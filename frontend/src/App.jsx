@@ -10,6 +10,21 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function Stars({ value = 0, count }) {
+  const rounded = Math.round(value);
+  return (
+    <div className="stars" aria-label={`Рейтинг ${value} из 5`}>
+      {[1, 2, 3, 4, 5].map(i => (
+        <span key={i} className={i <= rounded ? 'star filled' : 'star'}>★</span>
+      ))}
+      <span className="rating-num">
+        {value ? value.toFixed(1) : '—'}
+        {count ? ` (${count})` : ''}
+      </span>
+    </div>
+  );
+}
+
 export default function App() {
   const [authed, setAuthed] = useState(!!getToken());
   const [role, setRoleState] = useState(getRole());
@@ -30,6 +45,11 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState('');
   const [myPatientId, setMyPatientId] = useState(null);
+
+  // рейтинг и фильтры врачей
+  const [specialties, setSpecialties] = useState([]);
+  const [specialtyFilter, setSpecialtyFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('rating');
 
   const pushToast = (message, type = 'success') => {
     const id = Date.now() + Math.random();
@@ -69,12 +89,17 @@ export default function App() {
 
   useEffect(() => { if (authed) load(); }, [debouncedSearch, authed]);
 
-  // врачи
+  // врачи + специальности
   useEffect(() => {
     if (!authed) return;
     fetch(`${API}/doctors`, { headers: authHeaders() })
       .then(r => r.json())
-      .then(setDoctors)
+      .then(data => setDoctors(Array.isArray(data) ? data : []))
+      .catch(() => {});
+
+    fetch(`${API}/specialties`, { headers: authHeaders() })
+      .then(r => r.json())
+      .then(data => setSpecialties(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, [authed]);
 
@@ -217,6 +242,15 @@ export default function App() {
 
   const cancelledCount = appointments.filter(a => a.status === 'cancelled').length;
   const isStaff = role === 'staff';
+
+  const visibleDoctors = doctors
+    .filter(d => specialtyFilter === 'all' || d.specialty === specialtyFilter)
+    .sort((a, b) =>
+      sortBy === 'rating'
+        ? (Number(b.rating) || 0) - (Number(a.rating) || 0)
+        : a.name.localeCompare(b.name, 'ru')
+    );
+
   const slotsByDate = slots.reduce((acc, s) => {
     const date = s.slice(0, 10);
     if (!acc[date]) acc[date] = [];
@@ -289,19 +323,65 @@ export default function App() {
 
             <div className="booking-step">
               <div className="booking-label">1. Выберите врача</div>
-              <div className="doctor-grid">
-                {doctors.map(d => (
+
+              <div className="filter-row">
+                <button
+                  type="button"
+                  className={`filter-chip ${specialtyFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setSpecialtyFilter('all')}
+                >
+                  Все
+                </button>
+                {specialties.map(s => (
                   <button
-                    key={d.name}
+                    key={s}
                     type="button"
-                    className={`doctor-card ${selectedDoctor === d.name ? 'active' : ''}`}
-                    onClick={() => { setSelectedDoctor(d.name); setSelectedDate(''); setSelectedSlot(''); }}
+                    className={`filter-chip ${specialtyFilter === s ? 'active' : ''}`}
+                    onClick={() => setSpecialtyFilter(s)}
                   >
-                    <div className="doctor-name">{d.name}</div>
-                    <div className="doctor-specialty">{d.specialty}</div>
+                    {s}
                   </button>
                 ))}
               </div>
+
+              <div className="sort-row">
+                <span className="booking-label" style={{ margin: 0 }}>Сортировка:</span>
+                <button
+                  type="button"
+                  className={`filter-chip ${sortBy === 'rating' ? 'active' : ''}`}
+                  onClick={() => setSortBy('rating')}
+                >
+                  По рейтингу
+                </button>
+                <button
+                  type="button"
+                  className={`filter-chip ${sortBy === 'name' ? 'active' : ''}`}
+                  onClick={() => setSortBy('name')}
+                >
+                  По имени
+                </button>
+              </div>
+
+              {visibleDoctors.length === 0 ? (
+                <div className="empty-state" style={{ padding: '16px 0' }}>
+                  <div>Врачей с такой специальностью нет</div>
+                </div>
+              ) : (
+                <div className="doctor-grid">
+                  {visibleDoctors.map(d => (
+                    <button
+                      key={d.name}
+                      type="button"
+                      className={`doctor-card ${selectedDoctor === d.name ? 'active' : ''}`}
+                      onClick={() => { setSelectedDoctor(d.name); setSelectedDate(''); setSelectedSlot(''); }}
+                    >
+                      <div className="doctor-name">{d.name}</div>
+                      <div className="doctor-specialty">{d.specialty}</div>
+                      <Stars value={Number(d.rating) || 0} count={d.reviews_count} />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {selectedDoctor && (
