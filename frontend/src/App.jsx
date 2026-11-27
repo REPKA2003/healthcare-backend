@@ -266,6 +266,23 @@ export default function App() {
           </div>
         </div>
 
+        {isStaff && (
+          <section className="card" id="add">
+            <h2>Добавить пациента</h2>
+            <form onSubmit={addPatient} className="form-row">
+              <div className="field">
+                <label htmlFor="patient-name">ФИО</label>
+                <input id="patient-name" value={name} onChange={e => setName(e.target.value)} placeholder="Иванов Иван" required />
+              </div>
+              <div className="field">
+                <label htmlFor="patient-phone">Телефон</label>
+                <input id="patient-phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 999 000-00-00" required />
+              </div>
+              <button type="submit" className="btn-primary btn-block">Добавить</button>
+            </form>
+          </section>
+        )}
+
         {!isStaff && (
           <section className="card" id="book">
             <h2>Записаться на приём</h2>
