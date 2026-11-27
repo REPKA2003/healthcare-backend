@@ -27,6 +27,7 @@ export default function App() {
   const [doctors, setDoctors] = useState([]);
   const [selectedDoctor, setSelectedDoctor] = useState('');
   const [slots, setSlots] = useState([]);
+  const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState('');
   const [myPatientId, setMyPatientId] = useState(null);
 
@@ -79,10 +80,19 @@ export default function App() {
 
   // слоты при выборе врача
   useEffect(() => {
-    if (!selectedDoctor) return;
+    if (!selectedDoctor) {
+      setSlots([]);
+      setSelectedDate('');
+      setSelectedSlot('');
+      return;
+    }
     fetch(`${API}/doctors/${encodeURIComponent(selectedDoctor)}/slots`, { headers: authHeaders() })
       .then(r => r.json())
-      .then(setSlots)
+      .then(data => {
+        setSlots(Array.isArray(data) ? data : []);
+        setSelectedDate('');
+        setSelectedSlot('');
+      })
       .catch(() => setSlots([]));
   }, [selectedDoctor]);
 
@@ -207,6 +217,14 @@ export default function App() {
 
   const cancelledCount = appointments.filter(a => a.status === 'cancelled').length;
   const isStaff = role === 'staff';
+  const slotsByDate = slots.reduce((acc, s) => {
+    const date = s.slice(0, 10);
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(s);
+    return acc;
+  }, {});
+  const dates = Object.keys(slotsByDate).sort();
+  const timesForSelectedDate = selectedDate ? slotsByDate[selectedDate] || [] : [];
 
   return (
     <div className="page">
@@ -248,20 +266,92 @@ export default function App() {
           </div>
         </div>
 
-        {isStaff && (
-          <section className="card" id="add">
-            <h2>Добавить пациента</h2>
-            <form onSubmit={addPatient} className="form-row">
-              <div className="field">
-                <label htmlFor="patient-name">ФИО</label>
-                <input id="patient-name" value={name} onChange={e => setName(e.target.value)} placeholder="Иванов Иван" required />
+        {!isStaff && (
+          <section className="card" id="book">
+            <h2>Записаться на приём</h2>
+
+            <div className="booking-step">
+              <div className="booking-label">1. Выберите врача</div>
+              <div className="doctor-grid">
+                {doctors.map(d => (
+                  <button
+                    key={d.name}
+                    type="button"
+                    className={`doctor-card ${selectedDoctor === d.name ? 'active' : ''}`}
+                    onClick={() => { setSelectedDoctor(d.name); setSelectedDate(''); setSelectedSlot(''); }}
+                  >
+                    <div className="doctor-name">{d.name}</div>
+                    <div className="doctor-specialty">{d.specialty}</div>
+                  </button>
+                ))}
               </div>
-              <div className="field">
-                <label htmlFor="patient-phone">Телефон</label>
-                <input id="patient-phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 999 000-00-00" required />
+            </div>
+
+            {selectedDoctor && (
+              <div className="booking-step">
+                <div className="booking-label">2. Выберите дату</div>
+                {dates.length === 0 ? (
+                  <div className="empty-state" style={{ padding: '16px 0' }}>
+                    <div>На ближайшие 7 дней свободных слотов нет</div>
+                  </div>
+                ) : (
+                  <div className="date-row">
+                    {dates.map(d => {
+                      const dt = new Date(d + 'T00:00:00');
+                      const label = dt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', weekday: 'short' });
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          className={`date-chip ${selectedDate === d ? 'active' : ''}`}
+                          onClick={() => { setSelectedDate(d); setSelectedSlot(''); }}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              <button type="submit" className="btn-primary btn-block">Добавить</button>
-            </form>
+            )}
+
+            {selectedDate && (
+              <div className="booking-step">
+                <div className="booking-label">3. Выберите время</div>
+                {timesForSelectedDate.length === 0 ? (
+                  <div className="empty-state" style={{ padding: '16px 0' }}>
+                    <div>На этот день свободных слотов нет</div>
+                  </div>
+                ) : (
+                  <div className="time-grid">
+                    {timesForSelectedDate.map(s => (
+                      <button
+                        key={s}
+                        type="button"
+                        className={`time-chip ${selectedSlot === s ? 'active' : ''}`}
+                        onClick={() => setSelectedSlot(s)}
+                      >
+                        {s.slice(11, 16)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="btn-primary btn-block"
+              disabled={!myPatientId || !selectedDoctor || !selectedSlot}
+              onClick={bookAppointment}
+              style={{ marginTop: 12 }}
+            >
+              {!myPatientId
+                ? 'Нет привязанной карточки пациента'
+                : selectedSlot
+                  ? `Записаться на ${selectedSlot.slice(11, 16)}`
+                  : 'Выберите время'}
+            </button>
           </section>
         )}
 

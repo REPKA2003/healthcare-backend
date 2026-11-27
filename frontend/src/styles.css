@@ -436,6 +436,89 @@ section.card[id] {
   width: 100%;
 }
 
+.booking-step {
+  margin-bottom: 16px;
+}
+
+.booking-label {
+  font-size: .8rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.doctor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.doctor-card {
+  text-align: left;
+  background: #fafbfc;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+
+.doctor-card:hover { border-color: var(--primary); }
+
+.doctor-card.active {
+  border-color: var(--primary);
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(37,99,235,.15);
+}
+
+.doctor-name {
+  font-weight: 600;
+  font-size: .95rem;
+  color: var(--text);
+}
+
+.doctor-specialty {
+  font-size: .8rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.date-row,
+.time-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.date-chip,
+.time-chip {
+  background: #fafbfc;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: .9rem;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+
+.date-chip:hover,
+.time-chip:hover { border-color: var(--primary); }
+
+.date-chip.active,
+.time-chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .doctor-grid { grid-template-columns: 1fr; }
+  .date-row, .time-grid { gap: 6px; }
+  .date-chip, .time-chip { flex: 1 1 auto; text-align: center; }
+}
+
 /* Адаптивность */
 @media (max-width: 640px) {
   .page {
