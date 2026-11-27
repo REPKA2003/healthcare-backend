@@ -2,21 +2,19 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const { pool, connectWithRetry } = require('./db');
+const { login, authRequired, requireRole } = require('./auth');
 
 const app = express();
 
 app.use(cors({
   origin: 'https://healthcare-backend-phi.vercel.app',
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use(express.json());
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
-});
-
+// публичные маршруты — до authRequired
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -26,13 +24,26 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Поиск пациентов
+app.post('/api/auth/login', login);
+
+// всё ниже — только с токеном
+app.use('/api', authRequired);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// Пациенты: staff видит всех (с поиском), patient — только себя
 app.get('/api/patients', async (req, res) => {
   const { search } = req.query;
   let query = 'SELECT * FROM patients';
   const params = [];
 
-  if (search) {
+  if (req.user.role === 'patient') {
+    query += ' WHERE user_id = $1';
+    params.push(req.user.sub);
+  } else if (search) {
     query += ' WHERE full_name ILIKE $1 OR phone ILIKE $1';
     params.push(`%${search}%`);
   }
@@ -42,8 +53,8 @@ app.get('/api/patients', async (req, res) => {
   res.json(result.rows);
 });
 
-// Экспорт в CSV (должен быть до /api/patients/:id)
-app.get('/api/patients/export', async (req, res) => {
+// Экспорт CSV — только staff
+app.get('/api/patients/export', requireRole('staff'), async (req, res) => {
   const result = await pool.query('SELECT full_name, phone FROM patients ORDER BY id');
   let csv = 'ФИО,Телефон\n';
   result.rows.forEach(r => {
@@ -54,17 +65,25 @@ app.get('/api/patients/export', async (req, res) => {
   res.send('\uFEFF' + csv);
 });
 
+// Записи: patient видит только свои
 app.get('/api/appointments', async (req, res) => {
-  const result = await pool.query(`
+  let query = `
     SELECT a.*, p.full_name AS patient_name
     FROM appointments a
     JOIN patients p ON p.id = a.patient_id
-    ORDER BY a.appointment_time
-  `);
+  `;
+  const params = [];
+  if (req.user.role === 'patient') {
+    query += ' WHERE p.user_id = $1';
+    params.push(req.user.sub);
+  }
+  query += ' ORDER BY a.appointment_time';
+  const result = await pool.query(query, params);
   res.json(result.rows);
 });
 
-app.post('/api/patients', async (req, res) => {
+// Добавлять пациентов может только staff
+app.post('/api/patients', requireRole('staff'), async (req, res) => {
   const { full_name, phone } = req.body;
   if (!full_name || !phone) {
     return res.status(400).json({ error: 'full_name and phone required' });
@@ -76,8 +95,8 @@ app.post('/api/patients', async (req, res) => {
   res.status(201).json(result.rows[0]);
 });
 
-// Загрузка фото пациента (демо: возвращаем метаданные)
-app.post('/api/patients/:id/photo', upload.single('photo'), async (req, res) => {
+// Загрузка фото — только staff
+app.post('/api/patients/:id/photo', requireRole('staff'), upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
   res.json({
     message: 'Файл получен',
@@ -87,8 +106,23 @@ app.post('/api/patients/:id/photo', upload.single('photo'), async (req, res) => 
   });
 });
 
+// Создание записи: staff — для любого, patient — только для себя
 app.post('/api/appointments', async (req, res) => {
   const { patient_id, doctor_name, appointment_time, reason } = req.body;
+  if (!patient_id || !doctor_name || !appointment_time) {
+    return res.status(400).json({ error: 'patient_id, doctor_name, appointment_time required' });
+  }
+
+  if (req.user.role === 'patient') {
+    const check = await pool.query(
+      'SELECT 1 FROM patients WHERE id = $1 AND user_id = $2',
+      [patient_id, req.user.sub]
+    );
+    if (check.rowCount === 0) {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+  }
+
   const result = await pool.query(
     `INSERT INTO appointments (patient_id, doctor_name, appointment_time, reason)
      VALUES ($1, $2, $3, $4) RETURNING *`,
