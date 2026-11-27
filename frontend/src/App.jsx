@@ -355,42 +355,6 @@ export default function App() {
           </section>
         )}
 
-        {!isStaff && (
-          <section className="card" id="book">
-            <h2>Записаться на приём</h2>
-            <form onSubmit={bookAppointment} className="form-row" style={{ flexDirection: 'column' }}>
-              <div className="field">
-                <label>Врач</label>
-                <select
-                  value={selectedDoctor}
-                  onChange={e => { setSelectedDoctor(e.target.value); setSelectedSlot(''); }}
-                  required
-                >
-                  <option value="">Выберите врача</option>
-                  {doctors.map(d => <option key={d.name} value={d.name}>{d.name}</option>)}
-                </select>
-              </div>
-              <div className="field">
-                <label>Свободное время</label>
-                <select
-                  value={selectedSlot}
-                  onChange={e => setSelectedSlot(e.target.value)}
-                  required
-                  disabled={!slots.length}
-                >
-                  <option value="">{slots.length ? 'Выберите время' : 'Нет свободных слотов'}</option>
-                  {slots.map(s => (
-                    <option key={s} value={s}>{s.replace('T', ' ').slice(0, 16)}</option>
-                  ))}
-                </select>
-              </div>
-              <button type="submit" className="btn-primary btn-block" disabled={!myPatientId}>
-                {myPatientId ? 'Записаться' : 'Нет привязанной карточки пациента'}
-              </button>
-            </form>
-          </section>
-        )}
-
         <section className="card" id="patients">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
             <h2 style={{ margin: 0 }}>Пациенты</h2>
