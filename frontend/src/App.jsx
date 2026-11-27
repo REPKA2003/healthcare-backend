@@ -166,6 +166,27 @@ export default function App() {
     }
   };
 
+  const exportCsv = async () => {
+    try {
+      const res = await fetch(`${API}/patients/export`, {
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'patients.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      pushToast('CSV скачан');
+    } catch {
+      pushToast('Не удалось скачать CSV', 'error');
+    }
+  };
+
   const logout = () => {
     clearAuth();
     setAuthed(false);
@@ -284,9 +305,9 @@ export default function App() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
             <h2 style={{ margin: 0 }}>Пациенты</h2>
             {isStaff && (
-              <a href={`${API}/patients/export`} className="btn-ghost" style={{ padding: '8px 12px', textDecoration: 'none' }}>
+              <button onClick={exportCsv} className="btn-ghost" style={{ padding: '8px 12px' }}>
                 Экспорт в CSV
-              </a>
+              </button>
             )}
           </div>
 
