@@ -111,7 +111,9 @@ export default function App() {
           </nav>
           <div className="header-status">
             <span className={`status-dot ${online === false ? 'offline' : ''}`}></span>
-            {online === null ? 'Проверка...' : online ? 'Сервер доступен' : 'Сервер недоступен'}
+            <span className="status-text">
+              {online === null ? 'Проверка...' : online ? 'Сервер доступен' : 'Сервер недоступен'}
+            </span>
           </div>
         </div>
       </header>
