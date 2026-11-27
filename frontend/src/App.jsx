@@ -23,6 +23,13 @@ export default function App() {
   const [online, setOnline] = useState(null);
   const [toasts, setToasts] = useState([]);
 
+  // запись на приём
+  const [doctors, setDoctors] = useState([]);
+  const [selectedDoctor, setSelectedDoctor] = useState('');
+  const [slots, setSlots] = useState([]);
+  const [selectedSlot, setSelectedSlot] = useState('');
+  const [myPatientId, setMyPatientId] = useState(null);
+
   const pushToast = (message, type = 'success') => {
     const id = Date.now() + Math.random();
     setToasts(t => [...t, { id, message, type }]);
@@ -61,6 +68,31 @@ export default function App() {
 
   useEffect(() => { if (authed) load(); }, [debouncedSearch, authed]);
 
+  // врачи
+  useEffect(() => {
+    if (!authed) return;
+    fetch(`${API}/doctors`, { headers: authHeaders() })
+      .then(r => r.json())
+      .then(setDoctors)
+      .catch(() => {});
+  }, [authed]);
+
+  // слоты при выборе врача
+  useEffect(() => {
+    if (!selectedDoctor) return;
+    fetch(`${API}/doctors/${encodeURIComponent(selectedDoctor)}/slots`, { headers: authHeaders() })
+      .then(r => r.json())
+      .then(setSlots)
+      .catch(() => setSlots([]));
+  }, [selectedDoctor]);
+
+  // свой patient_id для пациента
+  useEffect(() => {
+    if (role === 'patient' && patients.length > 0) {
+      setMyPatientId(patients[0].id);
+    }
+  }, [patients, role]);
+
   const addPatient = async (e) => {
     e.preventDefault();
     try {
@@ -96,6 +128,44 @@ export default function App() {
     }
   };
 
+  const bookAppointment = async (e) => {
+    e.preventDefault();
+    if (!selectedDoctor || !selectedSlot || !myPatientId) return;
+    try {
+      const res = await fetch(`${API}/appointments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          patient_id: myPatientId,
+          doctor_name: selectedDoctor,
+          appointment_time: selectedSlot,
+          reason: 'Самостоятельная запись',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка записи');
+      pushToast('Запись создана');
+      setSelectedSlot('');
+      load();
+    } catch (e) {
+      pushToast(e.message, 'error');
+    }
+  };
+
+  const cancelAppointment = async (id) => {
+    try {
+      const res = await fetch(`${API}/appointments/${id}/cancel`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error();
+      pushToast('Запись отменена');
+      load();
+    } catch {
+      pushToast('Не удалось отменить', 'error');
+    }
+  };
+
   const logout = () => {
     clearAuth();
     setAuthed(false);
@@ -127,6 +197,7 @@ export default function App() {
           </a>
           <nav className="nav">
             {isStaff && <a href="#add" onClick={goTo('add')}>Добавить</a>}
+            {!isStaff && <a href="#book" onClick={goTo('book')}>Записаться</a>}
             <a href="#patients" onClick={goTo('patients')}>Пациенты</a>
             <a href="#appointments" onClick={goTo('appointments')}>Записи</a>
           </nav>
@@ -169,6 +240,42 @@ export default function App() {
                 <input id="patient-phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 999 000-00-00" required />
               </div>
               <button type="submit" className="btn-primary btn-block">Добавить</button>
+            </form>
+          </section>
+        )}
+
+        {!isStaff && (
+          <section className="card" id="book">
+            <h2>Записаться на приём</h2>
+            <form onSubmit={bookAppointment} className="form-row" style={{ flexDirection: 'column' }}>
+              <div className="field">
+                <label>Врач</label>
+                <select
+                  value={selectedDoctor}
+                  onChange={e => { setSelectedDoctor(e.target.value); setSelectedSlot(''); }}
+                  required
+                >
+                  <option value="">Выберите врача</option>
+                  {doctors.map(d => <option key={d.name} value={d.name}>{d.name}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>Свободное время</label>
+                <select
+                  value={selectedSlot}
+                  onChange={e => setSelectedSlot(e.target.value)}
+                  required
+                  disabled={!slots.length}
+                >
+                  <option value="">{slots.length ? 'Выберите время' : 'Нет свободных слотов'}</option>
+                  {slots.map(s => (
+                    <option key={s} value={s}>{s.replace('T', ' ').slice(0, 16)}</option>
+                  ))}
+                </select>
+              </div>
+              <button type="submit" className="btn-primary btn-block" disabled={!myPatientId}>
+                {myPatientId ? 'Записаться' : 'Нет привязанной карточки пациента'}
+              </button>
             </form>
           </section>
         )}
@@ -239,8 +346,15 @@ export default function App() {
                     {a.patient_name} → {a.doctor_name}
                     <div className="meta">{new Date(a.appointment_time).toISOString().slice(0, 16).replace('T', ' ')}</div>
                   </span>
-                  <span className={`badge badge-${a.status || 'scheduled'}`}>
-                    {a.status === 'cancelled' ? 'Отменена' : 'Запланирована'}
+                  <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span className={`badge badge-${a.status || 'scheduled'}`}>
+                      {a.status === 'cancelled' ? 'Отменена' : 'Запланирована'}
+                    </span>
+                    {a.status === 'scheduled' && (
+                      <button className="btn-danger" onClick={() => cancelAppointment(a.id)}>
+                        Отменить
+                      </button>
+                    )}
                   </span>
                 </li>
               ))}
