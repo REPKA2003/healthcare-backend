@@ -6,8 +6,18 @@ const { login, authRequired, requireRole } = require('./auth');
 
 const app = express();
 
+const allowedOrigins = [
+  'https://healthcare-backend-phi.vercel.app',
+  'healthcare-backend-phi.vercel.app',       
+  'http://localhost:5173',
+  'http://localhost:4173',
+];
+
 app.use(cors({
-  origin: 'https://healthcare-backend-phi.vercel.app',
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    cb(new Error('CORS'));
+  },
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
