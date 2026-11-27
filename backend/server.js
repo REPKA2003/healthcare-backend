@@ -33,13 +33,41 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-// Список врачей (хардкод, для демо)
+// Список врачей с рейтингом, фильтром по специальности и сортировкой
 app.get('/api/doctors', async (req, res) => {
-  res.json([
-    { name: 'Терапевт Смирнова', specialty: 'Терапевт' },
-    { name: 'Кардиолог Кузнецов', specialty: 'Кардиолог' },
-    { name: 'Невролог Орлова', specialty: 'Невролог' },
-  ]);
+  const { specialty, sort } = req.query;
+
+  let query = 'SELECT id, name, specialty, rating, reviews_count FROM doctors';
+  const params = [];
+
+  if (specialty && specialty !== 'all') {
+    query += ' WHERE specialty = $1';
+    params.push(specialty);
+  }
+
+  query += sort === 'name'
+    ? ' ORDER BY name'
+    : ' ORDER BY rating DESC, name';
+
+  try {
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'db error' });
+  }
+});
+
+// Список специальностей для чипсов на фронте
+app.get('/api/specialties', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT DISTINCT specialty FROM doctors ORDER BY specialty'
+    );
+    res.json(result.rows.map(r => r.specialty));
+  } catch (e) {
+    res.status(500).json({ error: 'db error' });
+  }
 });
 
 // Свободные слоты на 7 дней вперёд для врача
