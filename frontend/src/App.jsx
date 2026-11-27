@@ -137,9 +137,31 @@ export default function App() {
         <section className="card" id="add">
           <h2>Добавить пациента</h2>
           <form onSubmit={addPatient} className="form-row">
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="ФИО" required />
-            <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Телефон" required />
-            <button type="submit" className="btn-primary">Добавить</button>
+            <div className="field">
+              <label htmlFor="patient-name">ФИО</label>
+              <input
+                id="patient-name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Иванов Иван Иванович"
+                autoComplete="name"
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="patient-phone">Телефон</label>
+              <input
+                id="patient-phone"
+                type="tel"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="+7 999 000-00-00"
+                autoComplete="tel"
+                inputMode="tel"
+                required
+              />
+            </div>
+            <button type="submit" className="btn-primary btn-block">Добавить</button>
           </form>
         </section>
 
